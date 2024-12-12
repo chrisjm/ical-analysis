@@ -39,7 +39,8 @@ class CalendarAnalyzer:
         Returns:
             Dictionary mapping pattern names to lists of (datetime, event_summary, duration) tuples
         """
-        events_data = {}
+        # Initialize events_data with empty lists for all patterns
+        events_data = {pattern_name: [] for pattern_name in patterns}
         
         for component in self.calendar.walk():
             if component.name == "VEVENT":
@@ -83,8 +84,6 @@ class CalendarAnalyzer:
                 for pattern_name, regex in patterns.items():
                     match = regex.search(summary)
                     if match:  # Only process if we found a match
-                        if pattern_name not in events_data:
-                            events_data[pattern_name] = []
                         events_data[pattern_name].append((event_start, summary, duration))
         
         return events_data
