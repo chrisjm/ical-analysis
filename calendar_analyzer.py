@@ -41,7 +41,7 @@ class CalendarAnalyzer:
         """
         # Initialize events_data with empty lists for all patterns
         events_data = {pattern_name: [] for pattern_name in patterns}
-        
+
         for component in self.calendar.walk():
             if component.name == "VEVENT":
                 # Skip events without start time
@@ -58,40 +58,40 @@ class CalendarAnalyzer:
                     event_end = dtend.dt
 
                 summary = str(component.get('summary', ''))
-                
+
                 # Check if this is an all-day event (date instead of datetime)
                 is_all_day = not isinstance(component.get('dtstart').dt, datetime)
-                
+
                 # Convert to datetime if date
                 if isinstance(event_start, datetime):
                     event_start = event_start.replace(tzinfo=timezone.utc).astimezone(self.local_tz)
                 else:
                     event_start = datetime.combine(event_start, datetime.min.time(), tzinfo=self.local_tz)
-                    
+
                 if isinstance(event_end, datetime):
                     event_end = event_end.replace(tzinfo=timezone.utc).astimezone(self.local_tz)
                 else:
                     event_end = datetime.combine(event_end, datetime.min.time(), tzinfo=self.local_tz)
-                
+
                 # Skip if event is outside analysis period
                 if event_end < start_time or event_start > end_time:
                     continue
-                    
+
                 # Set duration to zero for all-day events, otherwise calculate normally
                 duration = timedelta(0) if is_all_day else (event_end - event_start)
-                
+
                 # Match against patterns
                 for pattern_name, regex in patterns.items():
                     match = regex.search(summary)
                     if match:  # Only process if we found a match
                         events_data[pattern_name].append((event_start, summary, duration))
-        
+
         return events_data
 
-    def get_day_distribution(self, events_data: Dict[str, List[Tuple[datetime, str, timedelta]]]) -> Dict[str, Dict[str, Dict[str, float]]]:
+    def get_day_stats(self, events_data: Dict[str, List[Tuple[datetime, str, timedelta]]]) -> Dict[str, Dict[str, Dict[str, float]]]:
         """
         Get distribution of events by day of week for each pattern.
-        
+
         Returns:
             Dictionary mapping pattern names to day distribution dictionaries.
             Each day contains:
@@ -102,20 +102,20 @@ class CalendarAnalyzer:
         days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
         distribution = {
             pattern: {
-                day: {'count': 0, 'total_hours': 0.0, 'avg_hours': 0.0} 
+                day: {'count': 0, 'total_hours': 0.0, 'avg_hours': 0.0}
                 for day in days
-            } 
+            }
             for pattern in events_data
         }
-        
+
         for pattern, events in events_data.items():
             for event_start, _, duration in events:
                 day = days[event_start.weekday()]
                 hours = duration.total_seconds() / 3600
-                
+
                 distribution[pattern][day]['count'] += 1
                 distribution[pattern][day]['total_hours'] += hours
-        
+
         # Calculate averages
         for pattern in distribution:
             for day in days:
@@ -124,7 +124,7 @@ class CalendarAnalyzer:
                     distribution[pattern][day]['avg_hours'] = (
                         distribution[pattern][day]['total_hours'] / count
                     )
-                
+
         return distribution
 
     def get_time_spent(self, events_data: Dict[str, List[Tuple[datetime, str, timedelta]]]) -> Dict[str, timedelta]:
@@ -145,7 +145,7 @@ class CalendarAnalyzer:
     def get_weekly_stats(self, events_data: Dict[str, List[Tuple[datetime, str, timedelta]]]) -> Dict[str, Dict[str, Dict[str, float]]]:
         """
         Calculate weekly statistics for each pattern.
-        
+
         Returns:
             Dictionary mapping pattern names to week statistics.
             Each week contains:
@@ -153,34 +153,34 @@ class CalendarAnalyzer:
                 - avg_hours: average hours per day in that week
         """
         weekly_stats = {}
-        
+
         for pattern, events in events_data.items():
             weekly_stats[pattern] = {}
-            
+
             for event_start, _, duration in events:
                 # Get the Monday of the week for this event
                 monday = event_start - timedelta(days=event_start.weekday())
                 week_key = monday.strftime('%Y-%m-%d')
-                
+
                 if week_key not in weekly_stats[pattern]:
                     weekly_stats[pattern][week_key] = {
                         'total_hours': 0.0,
                         'avg_hours': 0.0
                     }
-                
+
                 hours = duration.total_seconds() / 3600
                 weekly_stats[pattern][week_key]['total_hours'] += hours
-            
+
             # Calculate average hours per day for each week
             for week in weekly_stats[pattern].values():
                 week['avg_hours'] = week['total_hours'] / 7
-        
+
         return weekly_stats
 
     def get_monthly_stats(self, events_data: Dict[str, List[Tuple[datetime, str, timedelta]]]) -> Dict[str, Dict[str, Dict[str, float]]]:
         """
         Calculate monthly statistics for each pattern.
-        
+
         Returns:
             Dictionary mapping pattern names to month statistics.
             Each month contains:
@@ -189,25 +189,25 @@ class CalendarAnalyzer:
                 - event_count: number of events in that month
         """
         monthly_stats = {}
-        
+
         for pattern, events in events_data.items():
             monthly_stats[pattern] = {}
-            
+
             for event_start, _, duration in events:
                 # Get the first day of the month for this event
                 month_key = event_start.strftime('%Y-%m')
-                
+
                 if month_key not in monthly_stats[pattern]:
                     monthly_stats[pattern][month_key] = {
                         'total_hours': 0.0,
                         'avg_hours': 0.0,
                         'event_count': 0
                     }
-                
+
                 hours = duration.total_seconds() / 3600
                 monthly_stats[pattern][month_key]['total_hours'] += hours
                 monthly_stats[pattern][month_key]['event_count'] += 1
-            
+
             # Calculate average hours per day for each month
             for month_key, stats in monthly_stats[pattern].items():
                 # Get number of days in this month
@@ -217,9 +217,9 @@ class CalendarAnalyzer:
                 else:
                     next_month = datetime(year, month + 1, 1)
                 days_in_month = (next_month - datetime(year, month, 1)).days
-                
+
                 stats['avg_hours'] = stats['total_hours'] / days_in_month
-        
+
         return monthly_stats
 
 if __name__ == '__main__':
@@ -244,7 +244,7 @@ if __name__ == '__main__':
     results = analyzer.analyze_events(start_time, end_time, patterns)
 
     # Get analytics
-    day_dist = analyzer.get_day_distribution(results)
+    day_dist = analyzer.get_day_stats(results)
     time_spent = analyzer.get_time_spent(results)
     weekly_stats = analyzer.get_weekly_stats(results)
     monthly_stats = analyzer.get_monthly_stats(results)

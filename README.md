@@ -61,7 +61,7 @@ results = analyzer.analyze_events(start_time, end_time, patterns)
 
 # Get various statistics
 time_spent = analyzer.get_time_spent(results)  # Always included
-day_stats = analyzer.get_day_distribution(results)
+day_stats = analyzer.get_day_stats(results)
 monthly_stats = analyzer.get_monthly_stats(results)
 weekly_stats = analyzer.get_weekly_stats(results)
 

@@ -30,30 +30,30 @@ def create_sample_calendar(num_events=15):
     # Create a range of dates between Jan 2024 and Dec 2024
     start_date = datetime(2024, 1, 1, tzinfo=tz.gettz('America/Los_Angeles'))
     end_date = datetime(2024, 12, 31, tzinfo=tz.gettz('America/Los_Angeles'))
-    
+
     events = []
     for _ in range(num_events):
         event = Event()
-        
+
         # Random date and time
         random_days = random.randint(0, (end_date - start_date).days)
         random_hours = random.randint(9, 17)  # Business hours
         event_date = start_date + timedelta(days=random_days)
         event_datetime = event_date.replace(hour=random_hours, minute=random.randint(0, 59))
-        
+
         event.add('summary', random.choice(event_types))
         event.add('dtstart', event_datetime)
         event.add('dtend', event_datetime + timedelta(hours=1))
         event.add('dtstamp', event_datetime)
         event.add('uid', f'{random.randint(1000000, 9999999)}@example.com')
-        
+
         # Add description to some events
         if random.random() < 0.5:
             event.add('description', f"Details for {event['summary']}")
-        
+
         events.append(event)
         cal.add_component(event)
-    
+
     return cal
 
 @pytest.fixture
@@ -99,10 +99,10 @@ def test_calendar_loading(analyzer):
 def test_event_analysis(analyzer, sample_patterns, timeframe):
     start_time, end_time = timeframe
     results = analyzer.analyze_events(start_time, end_time, sample_patterns)
-    
+
     # Verify we have results for each pattern
     assert all(pattern_name in results for pattern_name in sample_patterns)
-    
+
     # Verify all events are within the timeframe
     for events in results.values():
         for dt, summary, duration in events:
@@ -116,14 +116,14 @@ def test_event_analysis(analyzer, sample_patterns, timeframe):
         for dt, summary, duration in events:
             print(f"{dt.strftime('%Y-%m-%d %H:%M')} - {summary} ({duration.total_seconds()/3600:.1f}h)")
 
-def test_day_distribution(analyzer, sample_patterns, timeframe):
+def test_day_stats(analyzer, sample_patterns, timeframe):
     start_time, end_time = timeframe
     results = analyzer.analyze_events(start_time, end_time, sample_patterns)
-    distribution = analyzer.get_day_distribution(results)
-    
+    distribution = analyzer.get_day_stats(results)
+
     # Verify we have distribution for each pattern
     assert all(pattern_name in distribution for pattern_name in sample_patterns)
-    
+
     # Verify we have all days of the week with required stats
     days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
     required_stats = ['count', 'total_hours', 'avg_hours']
@@ -134,7 +134,7 @@ def test_day_distribution(analyzer, sample_patterns, timeframe):
         )
         for dist in distribution.values()
     )
-    
+
     print("\nEvent distribution by day:")
     for pattern, dist in distribution.items():
         print(f"\n{pattern.title()}:")
@@ -148,10 +148,10 @@ def test_time_spent(analyzer, sample_patterns, timeframe):
     start_time, end_time = timeframe
     results = analyzer.analyze_events(start_time, end_time, sample_patterns)
     time_spent = analyzer.get_time_spent(results)
-    
+
     # Verify we have time spent for each pattern
     assert all(pattern_name in time_spent for pattern_name in sample_patterns)
-    
+
     print("\nTime spent on each event type:")
     for pattern, duration in time_spent.items():
         hours = duration.total_seconds() / 3600
@@ -161,12 +161,12 @@ def test_pattern_matching(analyzer, timeframe):
     start_time, end_time = timeframe
     pattern = re.compile(r'CSE 6040', re.IGNORECASE)
     results = analyzer.analyze_events(start_time, end_time, {'cse_events': pattern})
-    
+
     # Verify all matched events contain the pattern
     for events in results.values():
         for _, summary, _ in events:
             assert pattern.search(summary) is not None
-    
+
     print("\nCSE 6040 events:")
     for events in results.values():
         for dt, summary, duration in events:
@@ -193,20 +193,20 @@ def test_all_day_events(analyzer, timeframe):
 
     # Create analyzer with our test calendar
     test_analyzer = CalendarAnalyzer(temp_file)
-    
+
     # Define a pattern that will match our event
     patterns = {'meetings': re.compile(r'meeting', re.IGNORECASE)}
-    
+
     # Analyze events
     start_time, end_time = timeframe
     results = test_analyzer.analyze_events(start_time, end_time, patterns)
-    
+
     # Get time spent
     time_spent = test_analyzer.get_time_spent(results)
-    
+
     # Verify the all-day event has zero duration
     assert time_spent['meetings'] == timedelta(0), "All-day event should have zero duration"
-    
+
     # Clean up
     os.unlink(temp_file)
 
@@ -214,10 +214,10 @@ def test_weekly_stats(analyzer, sample_patterns, timeframe):
     start_time, end_time = timeframe
     results = analyzer.analyze_events(start_time, end_time, sample_patterns)
     weekly_stats = analyzer.get_weekly_stats(results)
-    
+
     # Verify we have weekly stats for each pattern
     assert all(pattern_name in weekly_stats for pattern_name in sample_patterns)
-    
+
     # Verify each week has required stats
     required_stats = ['total_hours', 'avg_hours']
     assert all(
@@ -225,7 +225,7 @@ def test_weekly_stats(analyzer, sample_patterns, timeframe):
         for pattern_stats in weekly_stats.values()
         for week_stats in pattern_stats.values()
     )
-    
+
     print("\nWeekly statistics:")
     for pattern, stats in weekly_stats.items():
         print(f"\n{pattern.title()}:")
@@ -236,10 +236,10 @@ def test_monthly_stats(analyzer, sample_patterns, timeframe):
     start_time, end_time = timeframe
     results = analyzer.analyze_events(start_time, end_time, sample_patterns)
     monthly_stats = analyzer.get_monthly_stats(results)
-    
+
     # Verify we have monthly stats for each pattern
     assert all(pattern_name in monthly_stats for pattern_name in sample_patterns)
-    
+
     # Verify each month has required stats
     required_stats = ['total_hours', 'avg_hours', 'event_count']
     assert all(
@@ -247,13 +247,13 @@ def test_monthly_stats(analyzer, sample_patterns, timeframe):
         for pattern_stats in monthly_stats.values()
         for month_stats in pattern_stats.values()
     )
-    
+
     # Verify month keys are in correct format (YYYY-MM)
     assert all(
         all(re.match(r'^\d{4}-\d{2}$', month_key) for month_key in pattern_stats.keys())
         for pattern_stats in monthly_stats.values()
     )
-    
+
     print("\nMonthly statistics:")
     for pattern, stats in monthly_stats.items():
         print(f"\n{pattern.title()}:")

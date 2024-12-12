@@ -15,7 +15,7 @@ def valid_date(s):
         msg = f"Not a valid date: '{s}'"
         raise argparse.ArgumentTypeError(msg)
 
-def plot_day_distribution(distribution):
+def plot_day_stats(distribution):
     """Create ASCII bar charts showing event distribution by day of week."""
     days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
     patterns = list(distribution.keys())
@@ -23,7 +23,7 @@ def plot_day_distribution(distribution):
     print("\nEvent Distribution by Day:")
     for pattern in patterns:
         counts = [distribution[pattern][day]['count'] for day in ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']]
-        hours = [distribution[pattern][day]['total_hours'] for day in ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']]
+        hours = [round(distribution[pattern][day]['total_hours'], 1) for day in ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']]
 
         print(f"\n{pattern} - Event Counts:")
         fig = tpl.figure()
@@ -35,40 +35,32 @@ def plot_day_distribution(distribution):
         fig.barh(hours, days)
         fig.show()
 
-def plot_time_spent(time_spent):
-    """Create ASCII bar chart showing total time spent by category."""
-    patterns = list(time_spent.keys())
-    hours = [duration.total_seconds() / 3600 for duration in time_spent.values()]
-
-    print("\nTotal Hours by Category:")
-    fig = tpl.figure()
-    fig.barh(hours, patterns)
-    fig.show()
-
 def plot_weekly_stats(weekly_stats):
-    """Create ASCII line plot showing weekly hours over time."""
+    """Create ASCII bar charts showing weekly hours by category."""
     print("\nWeekly Hours by Category:")
     for pattern, weeks in weekly_stats.items():
+        # Sort weeks by date
         weeks_sorted = sorted(weeks.items())
-        y = [week['total_hours'] for _, week in weeks_sorted]
-        x = list(range(len(y)))
+        week_labels = [week for week, _ in weeks_sorted]
+        hours = [round(week_data['total_hours'], 1) for _, week_data in weeks_sorted]
 
         print(f"\n{pattern}:")
         fig = tpl.figure()
-        fig.plot(x, y, label=pattern, width=60, height=15)
+        fig.barh(hours, week_labels)
         fig.show()
 
 def plot_monthly_stats(monthly_stats):
-    """Create ASCII line plot showing monthly hours over time."""
+    """Create ASCII bar charts showing monthly hours by category."""
     print("\nMonthly Hours by Category:")
     for pattern, months in monthly_stats.items():
+        # Sort months by date
         months_sorted = sorted(months.items())
-        y = [month['total_hours'] for _, month in months_sorted]
-        x = list(range(len(y)))
+        month_labels = [month for month, _ in months_sorted]
+        hours = [round(month_data['total_hours'], 1) for _, month_data in months_sorted]
 
         print(f"\n{pattern}:")
         fig = tpl.figure()
-        fig.plot(x, y, label=pattern, width=60, height=15)
+        fig.barh(hours, month_labels)
         fig.show()
 
 def main():
@@ -172,7 +164,7 @@ def main():
 
         # Show additional analyses if requested
         if args.show_day_stats:
-            distribution = analyzer.get_day_distribution(results)
+            distribution = analyzer.get_day_stats(results)
             print("\nEvent Distribution by Day:")
             for pattern_name, dist in distribution.items():
                 print(f"\n{pattern_name.title()}:")
@@ -201,11 +193,8 @@ def main():
 
         if args.show_graphs:
             if args.show_day_stats:
-                distribution = analyzer.get_day_distribution(results)
-                plot_day_distribution(distribution)
-
-            # Always show time spent graph
-            plot_time_spent(time_spent)
+                distribution = analyzer.get_day_stats(results)
+                plot_day_stats(distribution)
 
             if args.show_monthly_stats:
                 monthly_stats = analyzer.get_monthly_stats(results)
