@@ -67,24 +67,31 @@ for pattern_name, events in results.items():
 
 ### Command Line Interface
 
-The tool provides a powerful CLI for quick analysis:
+The tool provides a powerful CLI for analyzing calendar events:
 
 ```bash
-python cli.py analyze \
-    --calendar-dir /path/to/calendars \
-    --start-date "2024-01-01" \
-    --end-date "2024-12-31" \
-    --patterns "meetings:meeting|sync|standup" "social:lunch|dinner|party" \
-    --visualize
+python cli.py calendars/calendar.ics [--start "2024-01-01"] [--end "2024-12-31"] \
+    [--pattern "meeting|sync|standup"] \
+    [--show-distribution] [--show-time-spent] [--show-overlaps] \
+    [--show-weekly-stats] [--show-graphs]
 ```
 
 #### CLI Options:
-- `--calendar-dir`: Directory containing .ics files
-- `--start-date`: Analysis start date (timezone aware)
-- `--end-date`: Analysis end date (timezone aware)
-- `--patterns`: Pattern definitions in format "name:regex_pattern"
-- `--visualize`: Generate ASCII visualizations
-- `--output-format`: Choose output format (text/json)
+- `calendar_file`: Name of the .ics file to analyze
+- `--start`: Analysis start date (e.g., "2024-01-01" or "30 days ago"). Defaults to 30 days ago
+- `--end`: Analysis end date (e.g., "2024-12-31" or "today"). Defaults to today
+- `--pattern`: Regex pattern to filter events (searches both summary and description)
+- `--show-distribution`: Show event distribution by day of week
+- `--show-time-spent`: Show total time spent on matching events
+- `--show-overlaps`: Show overlapping events
+- `--show-weekly-stats`: Show weekly statistics including total and average hours per week
+- `--show-graphs`: Show visualizations of the analyses
+
+The tool provides visual analysis through ASCII charts showing:
+- Event counts by day of week
+- Hours spent by day of week
+- Total hours by category
+- Weekly hours over time
 
 ## Testing
 
