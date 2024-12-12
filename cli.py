@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 import re
 from dateutil import parser, tz
 from calendar_analyzer import CalendarAnalyzer
+import termplotlib as tpl
 
 def valid_date(s):
     """Convert string to datetime, used for argument parsing."""
@@ -14,17 +15,60 @@ def valid_date(s):
         msg = f"Not a valid date: '{s}'"
         raise argparse.ArgumentTypeError(msg)
 
+def plot_day_distribution(distribution):
+    """Create ASCII bar charts showing event distribution by day of week."""
+    days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+    patterns = list(distribution.keys())
+
+    print("\nEvent Distribution by Day:")
+    for pattern in patterns:
+        counts = [distribution[pattern][day]['count'] for day in ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']]
+        hours = [distribution[pattern][day]['total_hours'] for day in ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']]
+
+        print(f"\n{pattern} - Event Counts:")
+        fig = tpl.figure()
+        fig.barh(counts, days)
+        fig.show()
+
+        print(f"\n{pattern} - Hours Spent:")
+        fig = tpl.figure()
+        fig.barh(hours, days)
+        fig.show()
+
+def plot_time_spent(time_spent):
+    """Create ASCII bar chart showing total time spent by category."""
+    patterns = list(time_spent.keys())
+    hours = [duration.total_seconds() / 3600 for duration in time_spent.values()]
+
+    print("\nTotal Hours by Category:")
+    fig = tpl.figure()
+    fig.barh(hours, patterns)
+    fig.show()
+
+def plot_weekly_stats(weekly_stats):
+    """Create ASCII line plot showing weekly hours over time."""
+    print("\nWeekly Hours by Category:")
+    for pattern, weeks in weekly_stats.items():
+        weeks_sorted = sorted(weeks.items())
+        y = [week['total_hours'] for _, week in weeks_sorted]
+        x = list(range(len(y)))
+
+        print(f"\n{pattern}:")
+        fig = tpl.figure()
+        fig.plot(x, y, label=pattern, width=60, height=15)
+        fig.show()
+
 def main():
     parser = argparse.ArgumentParser(
         description='Analyze calendar events within a timeframe with optional regex filtering.'
     )
-    
+
     # Required calendar file argument
     parser.add_argument(
         'calendar_file',
         help='Name of the .ics file in the /calendars directory'
     )
-    
+
     # Date range arguments
     parser.add_argument(
         '--start',
@@ -36,13 +80,13 @@ def main():
         type=valid_date,
         help='End date (e.g., "2024-12-31" or "today"). Defaults to today.'
     )
-    
+
     # Event filtering
     parser.add_argument(
         '--pattern',
         help='Regex pattern to filter events (searches both summary and description)'
     )
-    
+
     # Analysis options
     parser.add_argument(
         '--show-distribution',
@@ -64,19 +108,24 @@ def main():
         action='store_true',
         help='Show weekly statistics including total and average hours per week'
     )
-    
+    parser.add_argument(
+        '--show-graphs',
+        action='store_true',
+        help='Show visualizations of the analyses'
+    )
+
     args = parser.parse_args()
-    
+
     # Set default dates if not provided
     now = datetime.now(tz.gettz('America/Los_Angeles'))
     if args.end is None:
         args.end = now
     if args.start is None:
         args.start = now - timedelta(days=30)
-    
+
     # Initialize analyzer with the specified calendar file
     analyzer = CalendarAnalyzer(args.calendar_file)
-    
+
     # Create patterns dict based on input
     if args.pattern:
         pattern = re.compile(args.pattern, re.IGNORECASE)
@@ -89,14 +138,14 @@ def main():
             'workout': re.compile(r'workout', re.IGNORECASE),
             'social': re.compile(r'lunch|coffee', re.IGNORECASE),
         }
-    
+
     try:
         # Analyze events
         results = analyzer.analyze_events(args.start, args.end, patterns)
-        
+
         # Print basic results
         print(f"\nAnalyzing events from {args.start.strftime('%Y-%m-%d')} to {args.end.strftime('%Y-%m-%d')}")
-        
+
         # Only show individual events if no analysis flags are set
         show_analyses = args.show_distribution or args.show_time_spent or args.show_overlaps or args.show_weekly_stats
         if not show_analyses:
@@ -104,7 +153,7 @@ def main():
                 print(f"\n{pattern_name.title()} ({len(events)} events):")
                 for dt, summary, duration in events:
                     print(f"{dt.strftime('%Y-%m-%d %H:%M')} - {summary} ({duration.total_seconds()/3600:.1f}h)")
-        
+
         # Show additional analyses if requested
         if args.show_distribution:
             distribution = analyzer.get_day_distribution(results)
@@ -116,14 +165,14 @@ def main():
                     total = stats['total_hours']
                     avg = stats['avg_hours']
                     print(f"  {day:9} - {count:2d} events, {total:5.1f} hours total ({avg:4.1f}h avg/event)")
-        
+
         if args.show_time_spent:
             time_spent = analyzer.get_time_spent(results)
             print("\nTime Spent on Events:")
             for pattern_name, duration in time_spent.items():
                 hours = duration.total_seconds() / 3600
                 print(f"{pattern_name.title()}: {hours:.1f} hours")
-        
+
         if args.show_overlaps:
             overlaps = analyzer.find_overlapping_events(results)
             if overlaps:
@@ -140,14 +189,27 @@ def main():
                 print(f"\n{pattern_name.title()}:")
                 for week, week_stats in sorted(stats.items()):
                     print(f"  Week of {week}: {week_stats['total_hours']:.1f} total hours ({week_stats['avg_hours']:.1f}h avg/day)")
-    
+
+        if args.show_graphs:
+            if args.show_distribution:
+                distribution = analyzer.get_day_distribution(results)
+                plot_day_distribution(distribution)
+
+            if args.show_time_spent:
+                time_spent = analyzer.get_time_spent(results)
+                plot_time_spent(time_spent)
+
+            if args.show_weekly_stats:
+                weekly_stats = analyzer.get_weekly_stats(results)
+                plot_weekly_stats(weekly_stats)
+
     except FileNotFoundError:
         print(f"Error: Calendar file '{args.calendar_file}' not found in /calendars directory")
         return 1
     except Exception as e:
         print(f"Error analyzing calendar: {str(e)}")
         return 1
-    
+
     return 0
 
 if __name__ == '__main__':

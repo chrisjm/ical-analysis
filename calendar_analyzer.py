@@ -39,44 +39,55 @@ class CalendarAnalyzer:
         Returns:
             Dictionary mapping pattern names to lists of (datetime, event_summary, duration) tuples
         """
-        results = {name: [] for name in patterns}
+        events_data = {}
+        
+        for component in self.calendar.walk():
+            if component.name == "VEVENT":
+                # Skip events without start time
+                dtstart = component.get('dtstart')
+                if not dtstart:
+                    continue
+                event_start = dtstart.dt
 
-        for component in self.calendar.walk('VEVENT'):
-            event_start = component.get('dtstart').dt
-            event_end = component.get('dtend').dt if component.get('dtend') else None
+                # Handle events without end time by using start time + 1 hour
+                dtend = component.get('dtend')
+                if not dtend:
+                    event_end = event_start + timedelta(hours=1)
+                else:
+                    event_end = dtend.dt
 
-            # Skip all-day events (events where start is a date, not datetime)
-            if not isinstance(event_start, datetime):
-                continue
-
-            # Convert timezone if needed
-            if event_start.tzinfo is None:
-                event_start = event_start.replace(tzinfo=self.local_tz)
-
-            if event_end and not isinstance(event_end, datetime):
-                event_end = datetime.combine(event_end,
-                                          datetime.max.time(),
-                                          tzinfo=self.local_tz)
-            elif event_end and event_end.tzinfo is None:
-                event_end = event_end.replace(tzinfo=self.local_tz)
-            elif not event_end:
-                event_end = event_start + timedelta(hours=1)
-
-            if start_time <= event_start <= end_time:
                 summary = str(component.get('summary', ''))
-                description = str(component.get('description', ''))
+                
+                # Convert to datetime if date
+                if isinstance(event_start, datetime):
+                    event_start = event_start.replace(tzinfo=timezone.utc).astimezone(self.local_tz)
+                else:
+                    event_start = datetime.combine(event_start, datetime.min.time(), tzinfo=self.local_tz)
+                    
+                if isinstance(event_end, datetime):
+                    event_end = event_end.replace(tzinfo=timezone.utc).astimezone(self.local_tz)
+                else:
+                    event_end = datetime.combine(event_end, datetime.min.time(), tzinfo=self.local_tz)
+                
+                # Skip if event is outside analysis period
+                if event_end < start_time or event_start > end_time:
+                    continue
+                    
                 duration = event_end - event_start
-
-                for pattern_name, pattern in patterns.items():
-                    # Check both summary and description for matches
-                    if pattern.search(summary) or pattern.search(description):
-                        results[pattern_name].append((event_start, summary, duration))
-
-        # Sort results by datetime
-        for pattern_name in results:
-            results[pattern_name].sort(key=lambda x: x[0])
-
-        return results
+                
+                # Match against patterns
+                for pattern_name, regex in patterns.items():
+                    if regex.search(summary):
+                        # Use the actual matched text as the key
+                        match = regex.search(summary)
+                        matched_text = match.group(0)
+                        pattern_key = f"{matched_text} Events"
+                        
+                        if pattern_key not in events_data:
+                            events_data[pattern_key] = []
+                        events_data[pattern_key].append((event_start, summary, duration))
+        
+        return events_data
 
     def get_day_distribution(self, events_data: Dict[str, List[Tuple[datetime, str, timedelta]]]) -> Dict[str, Dict[str, Dict[str, float]]]:
         """
@@ -218,14 +229,14 @@ if __name__ == '__main__':
     # Print analytics
     print("\nEvent Distribution by Day:")
     for pattern, dist in day_dist.items():
-        print(f"\n{pattern.title()}:")
+        print(f"\n{pattern}:")
         for day, stats in dist.items():
             print(f"  {day}: {stats['count']} events, {stats['total_hours']:.1f} hours, {stats['avg_hours']:.1f} hours/event")
 
     print("\nTime Spent on Each Event Type:")
     for pattern, duration in time_spent.items():
         hours = duration.total_seconds() / 3600
-        print(f"{pattern.title()}: {hours:.1f} hours")
+        print(f"{pattern}: {hours:.1f} hours")
 
     print("\nOverlapping Events:")
     for event1, event2, time in overlaps:
@@ -233,6 +244,6 @@ if __name__ == '__main__':
 
     print("\nWeekly Statistics:")
     for pattern, stats in weekly_stats.items():
-        print(f"\n{pattern.title()}:")
+        print(f"\n{pattern}:")
         for week, week_stats in stats.items():
             print(f"  Week of {week}: {week_stats['total_hours']:.1f} hours, {week_stats['avg_hours']:.1f} hours/day")
