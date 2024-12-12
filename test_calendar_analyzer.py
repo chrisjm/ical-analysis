@@ -180,3 +180,41 @@ def test_pattern_matching(analyzer, timeframe):
     for events in results.values():
         for dt, summary, duration in events:
             print(f"{dt.strftime('%Y-%m-%d %H:%M')} - {summary} ({duration.total_seconds()/3600:.1f}h)")
+
+def test_all_day_events(analyzer, timeframe):
+    """Test that all-day events are handled correctly with zero duration."""
+    # Create a test calendar with an all-day event
+    cal = Calendar()
+    cal.add('prodid', '-//Test Calendar//')
+    cal.add('version', '2.0')
+
+    # Add an all-day event
+    event = Event()
+    event.add('summary', 'All Day Meeting')
+    event.add('dtstart', datetime(2024, 1, 15).date())  # Note: using .date() makes it all-day
+    event.add('dtend', datetime(2024, 1, 16).date())
+    cal.add_component(event)
+
+    # Write to a temporary file
+    with tempfile.NamedTemporaryFile(mode='wb', suffix='.ics', delete=False) as f:
+        f.write(cal.to_ical())
+        temp_file = f.name
+
+    # Create analyzer with our test calendar
+    test_analyzer = CalendarAnalyzer(temp_file)
+    
+    # Define a pattern that will match our event
+    patterns = {'meetings': re.compile(r'meeting', re.IGNORECASE)}
+    
+    # Analyze events
+    start_time, end_time = timeframe
+    results = test_analyzer.analyze_events(start_time, end_time, patterns)
+    
+    # Get time spent
+    time_spent = test_analyzer.get_time_spent(results)
+    
+    # Verify the all-day event has zero duration
+    assert time_spent['meetings'] == timedelta(0), "All-day event should have zero duration"
+    
+    # Clean up
+    os.unlink(temp_file)

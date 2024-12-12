@@ -58,6 +58,9 @@ class CalendarAnalyzer:
 
                 summary = str(component.get('summary', ''))
                 
+                # Check if this is an all-day event (date instead of datetime)
+                is_all_day = not isinstance(component.get('dtstart').dt, datetime)
+                
                 # Convert to datetime if date
                 if isinstance(event_start, datetime):
                     event_start = event_start.replace(tzinfo=timezone.utc).astimezone(self.local_tz)
@@ -73,19 +76,16 @@ class CalendarAnalyzer:
                 if event_end < start_time or event_start > end_time:
                     continue
                     
-                duration = event_end - event_start
+                # Set duration to zero for all-day events, otherwise calculate normally
+                duration = timedelta(0) if is_all_day else (event_end - event_start)
                 
                 # Match against patterns
                 for pattern_name, regex in patterns.items():
-                    if regex.search(summary):
-                        # Use the actual matched text as the key
-                        match = regex.search(summary)
-                        matched_text = match.group(0)
-                        pattern_key = f"{matched_text} Events"
-                        
-                        if pattern_key not in events_data:
-                            events_data[pattern_key] = []
-                        events_data[pattern_key].append((event_start, summary, duration))
+                    match = regex.search(summary)
+                    if match:  # Only process if we found a match
+                        if pattern_name not in events_data:
+                            events_data[pattern_name] = []
+                        events_data[pattern_name].append((event_start, summary, duration))
         
         return events_data
 
