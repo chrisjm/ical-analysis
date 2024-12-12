@@ -13,6 +13,7 @@ A Python tool for analyzing iCalendar (.ics) files and aggregating events based 
   - Event distribution by day of week
   - Total time spent by category
   - Weekly hours over time
+  - Monthly statistics and trends
 - Command-line interface for easy analysis
 - Comprehensive test suite with pytest
 
@@ -45,7 +46,7 @@ import re
 # Initialize analyzer
 analyzer = CalendarAnalyzer(calendar_dir="/path/to/calendar/files")
 
-# Define timeframe
+# Define timeframe (optional - defaults to all events)
 start_time = datetime(2024, 12, 1, tzinfo=tz.gettz('America/Los_Angeles'))
 end_time = datetime(2024, 12, 31, tzinfo=tz.gettz('America/Los_Angeles'))
 
@@ -58,11 +59,17 @@ patterns = {
 # Analyze events
 results = analyzer.analyze_events(start_time, end_time, patterns)
 
+# Get various statistics
+time_spent = analyzer.get_time_spent(results)  # Always included
+day_stats = analyzer.get_day_distribution(results)
+monthly_stats = analyzer.get_monthly_stats(results)
+weekly_stats = analyzer.get_weekly_stats(results)
+
 # Process results
 for pattern_name, events in results.items():
     print(f"\n{pattern_name.title()} ({len(events)} events):")
-    for dt, summary in events:
-        print(f"{dt.strftime('%Y-%m-%d %H:%M')} - {summary}")
+    for dt, summary, duration in events:
+        print(f"{dt.strftime('%Y-%m-%d %H:%M')} - {summary} ({duration.total_seconds()/3600:.1f}h)")
 ```
 
 ### Command Line Interface
@@ -72,26 +79,28 @@ The tool provides a powerful CLI for analyzing calendar events:
 ```bash
 python cli.py calendars/calendar.ics [--start "2024-01-01"] [--end "2024-12-31"] \
     [--pattern "meeting|sync|standup"] \
-    [--show-distribution] [--show-time-spent] [--show-overlaps] \
+    [--show-day-stats] [--show-monthly-stats] \
     [--show-weekly-stats] [--show-graphs]
 ```
 
 #### CLI Options:
 - `calendar_file`: Name of the .ics file to analyze
-- `--start`: Analysis start date (e.g., "2024-01-01" or "30 days ago"). Defaults to 30 days ago
-- `--end`: Analysis end date (e.g., "2024-12-31" or "today"). Defaults to today
+- `--start`: Analysis start date (e.g., "2024-01-01" or "30 days ago"). Optional - defaults to all events
+- `--end`: Analysis end date (e.g., "2024-12-31" or "today"). Optional - defaults to current time
 - `--pattern`: Regex pattern to filter events (searches both summary and description)
-- `--show-distribution`: Show event distribution by day of week
-- `--show-time-spent`: Show total time spent on matching events
-- `--show-overlaps`: Show overlapping events
+- `--show-day-stats`: Show event distribution by day of week
+- `--show-monthly-stats`: Show monthly statistics including total hours, average hours per day, and event counts
 - `--show-weekly-stats`: Show weekly statistics including total and average hours per week
 - `--show-graphs`: Show visualizations of the analyses
+
+Note: Time spent analysis is always included in the output.
 
 The tool provides visual analysis through ASCII charts showing:
 - Event counts by day of week
 - Hours spent by day of week
 - Total hours by category
 - Weekly hours over time
+- Monthly trends and patterns
 
 ## Testing
 
@@ -99,13 +108,15 @@ The project includes a comprehensive test suite using pytest. Tests cover:
 
 - Calendar file loading and parsing
 - Event analysis and pattern matching
-- Time distribution calculations
-- Visualization functions
-- Edge cases (overlapping events, timezone handling)
+- Day of week distribution statistics
+- Time spent calculations
+- Weekly statistics analysis
+- Monthly statistics analysis
+- All-day event handling
 
-Run tests with:
+Run tests using:
 ```bash
-pytest test_calendar_analyzer.py -v
+pytest
 ```
 
 ## Contributing

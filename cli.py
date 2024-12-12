@@ -58,6 +58,19 @@ def plot_weekly_stats(weekly_stats):
         fig.plot(x, y, label=pattern, width=60, height=15)
         fig.show()
 
+def plot_monthly_stats(monthly_stats):
+    """Create ASCII line plot showing monthly hours over time."""
+    print("\nMonthly Hours by Category:")
+    for pattern, months in monthly_stats.items():
+        months_sorted = sorted(months.items())
+        y = [month['total_hours'] for _, month in months_sorted]
+        x = list(range(len(y)))
+
+        print(f"\n{pattern}:")
+        fig = tpl.figure()
+        fig.plot(x, y, label=pattern, width=60, height=15)
+        fig.show()
+
 def main():
     parser = argparse.ArgumentParser(
         description='Analyze calendar events within a timeframe with optional regex filtering.'
@@ -73,12 +86,12 @@ def main():
     parser.add_argument(
         '--start',
         type=valid_date,
-        help='Start date (e.g., "2024-01-01" or "30 days ago"). Defaults to 30 days ago.'
+        help='Start date (e.g., "2024-01-01" or "30 days ago")'
     )
     parser.add_argument(
         '--end',
         type=valid_date,
-        help='End date (e.g., "2024-12-31" or "today"). Defaults to today.'
+        help='End date (e.g., "2024-12-31" or "today")'
     )
 
     # Event filtering
@@ -89,19 +102,14 @@ def main():
 
     # Analysis options
     parser.add_argument(
-        '--show-distribution',
+        '--show-day-stats',
         action='store_true',
         help='Show event distribution by day of week'
     )
     parser.add_argument(
-        '--show-time-spent',
+        '--show-monthly-stats',
         action='store_true',
-        help='Show total time spent on matching events'
-    )
-    parser.add_argument(
-        '--show-overlaps',
-        action='store_true',
-        help='Show overlapping events'
+        help='Show monthly statistics including total hours, average hours per day, and event counts'
     )
     parser.add_argument(
         '--show-weekly-stats',
@@ -116,12 +124,12 @@ def main():
 
     args = parser.parse_args()
 
-    # Set default dates if not provided
+    # Set default dates if not provided - no time limit by default
     now = datetime.now(tz.gettz('America/Los_Angeles'))
     if args.end is None:
         args.end = now
     if args.start is None:
-        args.start = now - timedelta(days=30)
+        args.start = datetime(1970, 1, 1, tzinfo=tz.gettz('America/Los_Angeles'))
 
     # Initialize analyzer with the specified calendar file
     analyzer = CalendarAnalyzer(args.calendar_file)
@@ -147,15 +155,23 @@ def main():
         print(f"\nAnalyzing events from {args.start.strftime('%Y-%m-%d')} to {args.end.strftime('%Y-%m-%d')}")
 
         # Only show individual events if no analysis flags are set
-        show_analyses = args.show_distribution or args.show_time_spent or args.show_overlaps or args.show_weekly_stats
+        show_analyses = args.show_day_stats or args.show_monthly_stats or args.show_weekly_stats
+
         if not show_analyses:
             for pattern_name, events in results.items():
                 print(f"\n{pattern_name.title()} ({len(events)} events):")
                 for dt, summary, duration in events:
                     print(f"{dt.strftime('%Y-%m-%d %H:%M')} - {summary} ({duration.total_seconds()/3600:.1f}h)")
 
+        # Always show time spent
+        time_spent = analyzer.get_time_spent(results)
+        print("\nTime Spent on Events:")
+        for pattern_name, duration in time_spent.items():
+            hours = duration.total_seconds() / 3600
+            print(f"{pattern_name.title()}: {hours:.1f} hours")
+
         # Show additional analyses if requested
-        if args.show_distribution:
+        if args.show_day_stats:
             distribution = analyzer.get_day_distribution(results)
             print("\nEvent Distribution by Day:")
             for pattern_name, dist in distribution.items():
@@ -166,21 +182,14 @@ def main():
                     avg = stats['avg_hours']
                     print(f"  {day:9} - {count:2d} events, {total:5.1f} hours total ({avg:4.1f}h avg/event)")
 
-        if args.show_time_spent:
-            time_spent = analyzer.get_time_spent(results)
-            print("\nTime Spent on Events:")
-            for pattern_name, duration in time_spent.items():
-                hours = duration.total_seconds() / 3600
-                print(f"{pattern_name.title()}: {hours:.1f} hours")
-
-        if args.show_overlaps:
-            overlaps = analyzer.find_overlapping_events(results)
-            if overlaps:
-                print("\nOverlapping Events:")
-                for event1, event2, time in overlaps:
-                    print(f"{time.strftime('%Y-%m-%d %H:%M')} - '{event1}' overlaps with '{event2}'")
-            else:
-                print("\nNo overlapping events found.")
+        if args.show_monthly_stats:
+            monthly_stats = analyzer.get_monthly_stats(results)
+            print("\nMonthly Statistics:")
+            for pattern_name, stats in monthly_stats.items():
+                print(f"\n{pattern_name.title()}:")
+                for month, month_stats in sorted(stats.items()):
+                    print(f"  Month of {month}: {month_stats['total_hours']:.1f} total hours "
+                          f"({month_stats['avg_hours']:.1f}h avg/day), {month_stats['event_count']} events")
 
         if args.show_weekly_stats:
             weekly_stats = analyzer.get_weekly_stats(results)
@@ -191,13 +200,16 @@ def main():
                     print(f"  Week of {week}: {week_stats['total_hours']:.1f} total hours ({week_stats['avg_hours']:.1f}h avg/day)")
 
         if args.show_graphs:
-            if args.show_distribution:
+            if args.show_day_stats:
                 distribution = analyzer.get_day_distribution(results)
                 plot_day_distribution(distribution)
 
-            if args.show_time_spent:
-                time_spent = analyzer.get_time_spent(results)
-                plot_time_spent(time_spent)
+            # Always show time spent graph
+            plot_time_spent(time_spent)
+
+            if args.show_monthly_stats:
+                monthly_stats = analyzer.get_monthly_stats(results)
+                plot_monthly_stats(monthly_stats)
 
             if args.show_weekly_stats:
                 weekly_stats = analyzer.get_weekly_stats(results)

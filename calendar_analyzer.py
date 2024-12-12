@@ -142,27 +142,6 @@ class CalendarAnalyzer:
 
         return time_spent
 
-    def find_overlapping_events(self, events_data: Dict[str, List[Tuple[datetime, str, timedelta]]]) -> List[Tuple[str, str, datetime]]:
-        """
-        Find events that overlap in time.
-
-        Returns:
-            List of (event1_summary, event2_summary, overlap_time) tuples
-        """
-        all_events = []
-        for pattern, events in events_data.items():
-            for start, summary, duration in events:
-                all_events.append((start, start + duration, summary))
-
-        overlaps = []
-        for i, (start1, end1, summary1) in enumerate(all_events):
-            for start2, end2, summary2 in all_events[i+1:]:
-                if start1 < end2 and start2 < end1:
-                    overlap_time = min(end1, end2)
-                    overlaps.append((summary1, summary2, overlap_time))
-
-        return overlaps
-
     def get_weekly_stats(self, events_data: Dict[str, List[Tuple[datetime, str, timedelta]]]) -> Dict[str, Dict[str, Dict[str, float]]]:
         """
         Calculate weekly statistics for each pattern.
@@ -198,6 +177,51 @@ class CalendarAnalyzer:
         
         return weekly_stats
 
+    def get_monthly_stats(self, events_data: Dict[str, List[Tuple[datetime, str, timedelta]]]) -> Dict[str, Dict[str, Dict[str, float]]]:
+        """
+        Calculate monthly statistics for each pattern.
+        
+        Returns:
+            Dictionary mapping pattern names to month statistics.
+            Each month contains:
+                - total_hours: total time spent in the month
+                - avg_hours: average hours per day in that month
+                - event_count: number of events in that month
+        """
+        monthly_stats = {}
+        
+        for pattern, events in events_data.items():
+            monthly_stats[pattern] = {}
+            
+            for event_start, _, duration in events:
+                # Get the first day of the month for this event
+                month_key = event_start.strftime('%Y-%m')
+                
+                if month_key not in monthly_stats[pattern]:
+                    monthly_stats[pattern][month_key] = {
+                        'total_hours': 0.0,
+                        'avg_hours': 0.0,
+                        'event_count': 0
+                    }
+                
+                hours = duration.total_seconds() / 3600
+                monthly_stats[pattern][month_key]['total_hours'] += hours
+                monthly_stats[pattern][month_key]['event_count'] += 1
+            
+            # Calculate average hours per day for each month
+            for month_key, stats in monthly_stats[pattern].items():
+                # Get number of days in this month
+                year, month = map(int, month_key.split('-'))
+                if month == 12:
+                    next_month = datetime(year + 1, 1, 1)
+                else:
+                    next_month = datetime(year, month + 1, 1)
+                days_in_month = (next_month - datetime(year, month, 1)).days
+                
+                stats['avg_hours'] = stats['total_hours'] / days_in_month
+        
+        return monthly_stats
+
 if __name__ == '__main__':
     # Example usage with analytics
     analyzer = CalendarAnalyzer('calendar.ics')
@@ -222,8 +246,8 @@ if __name__ == '__main__':
     # Get analytics
     day_dist = analyzer.get_day_distribution(results)
     time_spent = analyzer.get_time_spent(results)
-    overlaps = analyzer.find_overlapping_events(results)
     weekly_stats = analyzer.get_weekly_stats(results)
+    monthly_stats = analyzer.get_monthly_stats(results)
 
     # Print analytics
     print("\nEvent Distribution by Day:")
@@ -237,12 +261,14 @@ if __name__ == '__main__':
         hours = duration.total_seconds() / 3600
         print(f"{pattern}: {hours:.1f} hours")
 
-    print("\nOverlapping Events:")
-    for event1, event2, time in overlaps:
-        print(f"{event1} overlaps with {event2} at {time.strftime('%Y-%m-%d %H:%M')}")
-
     print("\nWeekly Statistics:")
     for pattern, stats in weekly_stats.items():
         print(f"\n{pattern}:")
         for week, week_stats in stats.items():
             print(f"  Week of {week}: {week_stats['total_hours']:.1f} hours, {week_stats['avg_hours']:.1f} hours/day")
+
+    print("\nMonthly Statistics:")
+    for pattern, stats in monthly_stats.items():
+        print(f"\n{pattern}:")
+        for month, month_stats in stats.items():
+            print(f"  Month of {month}: {month_stats['total_hours']:.1f} hours, {month_stats['avg_hours']:.1f} hours/day, {month_stats['event_count']} events")

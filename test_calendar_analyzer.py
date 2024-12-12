@@ -157,15 +157,6 @@ def test_time_spent(analyzer, sample_patterns, timeframe):
         hours = duration.total_seconds() / 3600
         print(f"{pattern.title()}: {hours:.1f} hours")
 
-def test_overlapping_events(analyzer, sample_patterns, timeframe):
-    start_time, end_time = timeframe
-    results = analyzer.analyze_events(start_time, end_time, sample_patterns)
-    overlaps = analyzer.find_overlapping_events(results)
-    
-    print("\nOverlapping events:")
-    for event1, event2, time in overlaps:
-        print(f"{event1} overlaps with {event2} at {time.strftime('%Y-%m-%d %H:%M')}")
-
 def test_pattern_matching(analyzer, timeframe):
     start_time, end_time = timeframe
     pattern = re.compile(r'CSE 6040', re.IGNORECASE)
@@ -218,3 +209,54 @@ def test_all_day_events(analyzer, timeframe):
     
     # Clean up
     os.unlink(temp_file)
+
+def test_weekly_stats(analyzer, sample_patterns, timeframe):
+    start_time, end_time = timeframe
+    results = analyzer.analyze_events(start_time, end_time, sample_patterns)
+    weekly_stats = analyzer.get_weekly_stats(results)
+    
+    # Verify we have weekly stats for each pattern
+    assert all(pattern_name in weekly_stats for pattern_name in sample_patterns)
+    
+    # Verify each week has required stats
+    required_stats = ['total_hours', 'avg_hours']
+    assert all(
+        all(stat in week_stats for stat in required_stats)
+        for pattern_stats in weekly_stats.values()
+        for week_stats in pattern_stats.values()
+    )
+    
+    print("\nWeekly statistics:")
+    for pattern, stats in weekly_stats.items():
+        print(f"\n{pattern.title()}:")
+        for week, week_stats in sorted(stats.items()):
+            print(f"  Week of {week}: {week_stats['total_hours']:.1f} total hours ({week_stats['avg_hours']:.1f}h avg/day)")
+
+def test_monthly_stats(analyzer, sample_patterns, timeframe):
+    start_time, end_time = timeframe
+    results = analyzer.analyze_events(start_time, end_time, sample_patterns)
+    monthly_stats = analyzer.get_monthly_stats(results)
+    
+    # Verify we have monthly stats for each pattern
+    assert all(pattern_name in monthly_stats for pattern_name in sample_patterns)
+    
+    # Verify each month has required stats
+    required_stats = ['total_hours', 'avg_hours', 'event_count']
+    assert all(
+        all(stat in month_stats for stat in required_stats)
+        for pattern_stats in monthly_stats.values()
+        for month_stats in pattern_stats.values()
+    )
+    
+    # Verify month keys are in correct format (YYYY-MM)
+    assert all(
+        all(re.match(r'^\d{4}-\d{2}$', month_key) for month_key in pattern_stats.keys())
+        for pattern_stats in monthly_stats.values()
+    )
+    
+    print("\nMonthly statistics:")
+    for pattern, stats in monthly_stats.items():
+        print(f"\n{pattern.title()}:")
+        for month, month_stats in sorted(stats.items()):
+            print(f"  Month of {month}: {month_stats['total_hours']:.1f} total hours "
+                  f"({month_stats['avg_hours']:.1f}h avg/day), {month_stats['event_count']} events")
