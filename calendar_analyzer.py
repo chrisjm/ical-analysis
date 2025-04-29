@@ -185,7 +185,7 @@ class CalendarAnalyzer:
             Dictionary mapping pattern names to month statistics.
             Each month contains:
                 - total_hours: total time spent in the month
-                - avg_hours: average hours per day in that month
+                - avg_hours: average hours per week in that month
                 - event_count: number of events in that month
         """
         monthly_stats = {}
@@ -208,7 +208,7 @@ class CalendarAnalyzer:
                 monthly_stats[pattern][month_key]['total_hours'] += hours
                 monthly_stats[pattern][month_key]['event_count'] += 1
 
-            # Calculate average hours per day for each month
+            # Calculate average hours per week for each month
             for month_key, stats in monthly_stats[pattern].items():
                 # Get number of days in this month
                 year, month = map(int, month_key.split('-'))
@@ -217,8 +217,12 @@ class CalendarAnalyzer:
                 else:
                     next_month = datetime(year, month + 1, 1)
                 days_in_month = (next_month - datetime(year, month, 1)).days
-
-                stats['avg_hours'] = stats['total_hours'] / days_in_month
+                
+                # Calculate number of weeks in the month (can be fractional)
+                weeks_in_month = days_in_month / 7.0
+                
+                # Calculate average hours per week
+                stats['avg_hours'] = stats['total_hours'] / weeks_in_month
 
         return monthly_stats
 
